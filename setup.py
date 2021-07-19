@@ -10,7 +10,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=7.0', ]
+requirements = ['Click>=7.0', 'boto3']
 
 test_requirements = ['pytest>=3', ]
 
@@ -31,7 +31,7 @@ setup(
     description="Create APIs by combining models and state machines",
     entry_points={
         'console_scripts': [
-            'python_api_machine=python_api_machine.cli:main',
+            'api_machine=api_machine.cli:main',
         ],
     },
     install_requires=requirements,
@@ -39,11 +39,12 @@ setup(
     long_description=readme + '\n\n' + history,
     include_package_data=True,
     keywords='python_api_machine',
-    name='python_api_machine',
-    packages=find_packages(include=['python_api_machine', 'python_api_machine.*']),
+    name='api_machine',
+    packages=find_packages(
+        include=['api_machine', 'api_machine.*']),
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/itsallcode-nl/python_api_machine',
-    version='0.1.0',
+    version='0.1.1',
     zip_safe=False,
 )
