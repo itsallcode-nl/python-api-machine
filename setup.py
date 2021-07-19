@@ -39,7 +39,7 @@ setup(
     long_description=readme + '\n\n' + history,
     include_package_data=True,
     keywords='python_api_machine',
-    name='api_machine',
+    name='python_api_machine',
     packages=find_packages(
         include=['api_machine', 'api_machine.*']),
     test_suite='tests',
