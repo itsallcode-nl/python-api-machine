@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field, fields, make_dataclass
+from dataclasses import dataclass, field, fields, make_dataclass, replace
 
 from .schema import dataclass_to_model
 from .lifecycle import StateMachine
@@ -42,22 +42,28 @@ class Entity:
     def __post_init__(self):
         if isinstance(self.lifecycle, list):
             self.lifecycle = StateMachine(self.lifecycle)
-        self.schema = dataclass_to_model(self.schema)
 
     def create(self, values: dict):
-        return self.Schema(**values)
+        return self.schema(**values)
 
     def update(self, obj, values: dict):
-        return obj.copy(update=values)
+        return replace(obj, **values)
 
     def delete(self, obj):
         return obj
 
     def set_status(self, obj, action):
+        print(obj)
         if hasattr(obj, "status"):
-            self.obj.status = self.lifecycle.do(
-                self.obj.status, action
+            obj.status = self.lifecycle.do(
+                obj.status, action
             ).target
+
+    def scope_transition(self, state, action, fields):
+        transition = self.lifecycle[state, action]
+        transition.metadata['scoped'] = {
+            'fields': fields
+        }
 
     def fields(self, include=None, aslist=False):
         result = fields(self.schema)
@@ -65,7 +71,8 @@ class Entity:
             result = [f for f in result if f.name in include]
         if aslist:
             return list(
-                (f.name, f.type, f) for f in result
+                (f.name, f.type, field(default_factory=f.default_factory))
+                for f in result
             )
         return set(
             f.name for f in result

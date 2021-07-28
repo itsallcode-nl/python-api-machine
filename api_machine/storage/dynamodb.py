@@ -1,10 +1,13 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from decimal import Decimal
 import enum
 import os
 
 import boto3
 from botocore.exceptions import NoRegionError
+
+from api_machine import exc
 
 
 class EnvEnum(int, enum.Enum):
@@ -87,9 +90,11 @@ class DynamoTable:
         def get_by_ref(self, ref):
             return self.objects[ref]
 
-        def serialize(self):
+        def serialize(self, model=dict):
             return {
-                "items": self.items,
+                "items": [
+                    model(i) for i in self.items
+                ],
             }
 
     def deserialize(self, items: list):
@@ -105,11 +110,33 @@ class DynamoTable:
 try:
     boto3.resource('dynamodb')
     deserializer = boto3.dynamodb.types.TypeDeserializer()
-    serializer = boto3.dynamodb.types.TypeSerializer()
+    _serializer = boto3.dynamodb.types.TypeSerializer()
+
 except NoRegionError:
     # Ignore, this happens because of imports
     # that don't acutally require this service
     pass
+
+
+class Serializer:
+    backend = _serializer.serialize
+
+    def _parse(self, v):
+        if isinstance(v, dict):
+            return dict(
+                (k, self._parse(v)) for k, v in v.items()
+            )
+
+        if isinstance(v, float):
+            return Decimal(str(v))
+        return v
+
+    def serialize(self, v):
+        v = self._parse(v)
+        return self.backend(v)
+
+
+serializer = Serializer()
 
 
 def inject_assumed_role(cfg_key: str, params: dict):
@@ -208,12 +235,33 @@ class DynamoRepository:
 
     def insert(self, data):
         client = self.client
-        response = client.put_item(
+        return client.put_item(
             TableName=self.config.source.name,
             Item={
-                k: serializer.serialize(v) for k, v in data.items()
+                v: serializer.serialize(data.get(k)) for k, v in
+                self.config.source.schema.items()
             }
         )
+
+    def get(self, key: dict):
+        client = self.client
+        response = client.get_item(
+            TableName=self.config.source.name,
+            Key={
+                self.config.source.schema[k]: serializer.serialize(v) for
+                k, v in key.items()
+            }
+        )
+        try:
+            item = response['Item']
+        except KeyError:
+            raise exc.ObjectNotFound(
+                self.config.source.name, key
+            )
+        return self.config.source.deserialize([item]).items[0]
+
+    def update(self, key, values):
+        return self.insert(values)
 
     def batch_insert(self, data: list):
         """ Upserts a batch of item in a DynamoDB table """

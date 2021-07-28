@@ -1,11 +1,13 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import typing
 
-from . import exc
+from . import exc, events
 from .lifecycle import Transition
 from .entity import Entity, InputMessage, Message
+from .pubsub import Broadcaster
 from .schema import (
-    extract_schema, dataclass_to_model, ValidationError
+    extract_schema, dataclass_to_model, ValidationError,
+    serialize
 )
 
 
@@ -17,8 +19,8 @@ class OperationContext:
 
     def create(self, values):
         instance = self.entity.create(values)
-        return self.repository.create(
-            instance.dict()
+        return self.repository.insert(
+            serialize(instance)
         )
 
     def get(self, key):
@@ -27,9 +29,11 @@ class OperationContext:
         )
 
     def update(self, key, instance, values):
-        new_instance = self.entity.update(instance, values)
+        new_instance = self.entity.update(
+            instance, values
+        )
         return self.repository.update(
-            key, new_instance.dict()
+            key, serialize(new_instance)
         )
 
     def list(self, payload):
@@ -37,7 +41,7 @@ class OperationContext:
         return self.repository.list(
             list_params.pop('expr'),
             **list_params['params']
-        ).serialize()
+        ).serialize(self.entity.create)
 
 
 @dataclass
@@ -48,11 +52,19 @@ class Operation:
     private_model: object = None
     output_model: object = None
     __action_type__ = None
+    __result_type__ = None
 
     @property
     def ref(self):
         return ":".join([
             self.entity.name, self.__action_type__,
+            self.action
+        ])
+
+    @property
+    def output_ref(self):
+        return ":".join([
+            self.entity.name, self.__result_type__,
             self.action
         ])
 
@@ -70,8 +82,8 @@ class Operation:
         ])
 
     @classmethod
-    def create(cls, action, entity):
-        fields = cls.get_fields(
+    def create(cls, action, entity, scope=None):
+        fields = scope or cls.get_fields(
             entity
         )
         input_fields = fields - entity.private
@@ -90,17 +102,19 @@ class Operation:
     def deserialize(self, payload):
         try:
             obj = self.input_model(**payload)
-        except ValidationError:
-            raise exc.ValidationError
+        except ValidationError as e:
+            raise exc.ValidationError(
+                e.json()
+            )
 
         if self.private_model:
             return self.private_model(**asdict(obj))
         return obj
 
     def get_primary_key(self, payload):
-        return [
-            getattr(payload, k) for k in self.entity.key
-        ]
+        return dict(
+            (k, getattr(payload, k)) for k in self.entity.key
+        )
 
     def __call__(self, context: OperationContext, msg: InputMessage):
         msg = Message(
@@ -112,20 +126,20 @@ class Operation:
 
 class Mutation(Operation):
     __action_type__ = "command"
+    __result_type__ = "event"
 
 
 class Query(Operation):
     __action_type__ = "query"
+    __result_type__ = "result"
 
 
 class CreateOperation(Mutation):
     __action_type__ = "command"
 
-    def execute(self, msg):
-        self.entity.lifecycle.do(
-            None, self.action
-        )
-        return self.context.create(msg.payload.dict())
+    def execute(self, context: OperationContext, msg):
+        values = asdict(msg.payload)
+        return context.create(values)
 
 
 class GetOperation(Query):
@@ -142,24 +156,23 @@ class UpdateOperation(Mutation):
     @classmethod
     def get_fields(cls, entity):
         fields = super().get_fields(entity)
-        return fields & entity.mutable
+        return entity.key & fields & entity.mutable
 
     def execute(self, context: OperationContext, msg):
         key = self.get_primary_key(msg.payload)
         instance = context.get(key)
         context.entity.set_status(instance, self.action)
-        return context.update(key, instance, msg.payload.dict())
+        msg.payload.status = instance.status
+        return context.update(key, instance, asdict(msg.payload))
 
 
 class ListOperation(Query):
     @classmethod
     def create(cls, action, entity):
-        @dataclass
         class ListModel:
-            expr: str = None
-            params: dict = None
+            expr: str = ""
+            params: dict = field(default_factory=dict)
 
-        @dataclass
         class EntityList:
             items: typing.List[entity.schema]
 
@@ -176,7 +189,9 @@ class ListOperation(Query):
         return context.list(msg.payload)
 
 
-def action_to_operation(action: str):
+def action_to_operation(from_state: str, action: str):
+    if from_state is None:
+        return CreateOperation
     return {
         'create': CreateOperation,
         'update': UpdateOperation,
@@ -191,17 +206,28 @@ class OperationRegistry(dict):
 class Service:
     operations = None
 
-    def __init__(self):
+    def __init__(self, name):
         self.operations = OperationRegistry()
+        self.name = name
+        self.events = Broadcaster()
         self.repos = {}
 
     def mount_entity(self, entity, repository):
         for transition in entity.lifecycle.transitions:
+            params = transition.metadata or {}
+
+            scope = None
+            try:
+                scope = params['scoped']['fields']
+            except KeyError:
+                pass
+
             operation_cls = action_to_operation(
-                transition.action
+                transition.state, transition.action
             )
             operation = operation_cls.create(
-                transition.action, entity
+                transition.action, entity,
+                scope=scope
             )
             self.mount_operation(operation)
 
@@ -220,12 +246,60 @@ class Service:
         scoped_ref = ":".join(msg.ref.split(":")[1:])
         try:
             operation = self.operations[scoped_ref]
-            context = operation.create_context(
-                self
+        except KeyError:
+            raise exc.OperationDoesNotExist()
+
+        context = operation.create_context(
+            self
+        )
+        self.events.accept(
+            events.ServiceBeforeCall,
+            events.ServiceBeforeCall(
+                msg=msg
             )
-            return operation(
+        )
+        try:
+            result = operation(
                 context,
                 msg
             )
-        except KeyError:
-            raise exc.OperationDoesNotExist()
+            event = events.ServiceAfterSuccess
+
+        except exc.ClientError as e:
+            result = Message(
+                "system",
+                e.payload
+            )
+            event = events.ServiceAfterFail
+        else:
+            result = Message(
+                operation.output_ref,
+                result
+            )
+
+        self.events.accept(
+            event,
+            event(
+                msg=msg, result=result
+            )
+        )
+
+        return result
+
+    def get(self, entity, key):
+        return self(InputMessage(
+            f"{self.name}:{entity}:query:get",
+            key
+        ))
+
+    def list(self, entity, payload):
+        return self(InputMessage(
+            f"{self.name}:{entity}:query:list",
+            payload
+        ))
+
+    def action(self, entity, action, payload: dict):
+        return self(InputMessage(
+            f"{self.name}:{entity}:command:{action}",
+            payload
+        ))

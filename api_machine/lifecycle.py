@@ -1,4 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+STATE_WILDCARD = "*"
 
 
 @dataclass
@@ -6,16 +8,17 @@ class Transition:
     state: str
     action: str
     target: str
-    metadata: dict = None
+    metadata: dict = field(default_factory=dict)
 
 
 class StateMachine:
     def __init__(self, transitions=None):
         self.transitions = transitions or []
 
-    def do(self, current_state, action):
+    def __getitem__(self, key):
+        state, action = key
         for transition in self.transitions:
-            if transition.state != current_state:
+            if transition.state not in [STATE_WILDCARD, state]:
                 continue
 
             if transition.action != action:
@@ -23,9 +26,15 @@ class StateMachine:
 
             return transition
 
-        raise ValueError(
-            f"Invalid action {action} on state {current_state}"
-        )
+        raise KeyError(f"No transition {action} on {state=}")
+
+    def do(self, current_state, action):
+        try:
+            return self[current_state, action]
+        except IndexError:
+            raise ValueError(
+                f"Invalid action {action} on state {current_state}"
+            )
 
 
 CrudLifeCycle = [
