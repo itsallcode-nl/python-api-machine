@@ -2,14 +2,12 @@ import dataclasses
 import logging
 import typing
 
-logger = logging.getLogger()
-
 
 def shoot_and_forget(handler, msg):
     try:
         handler(msg)
     except Exception as e:
-        logger.info(e)
+        logging.warning(e)
 
 
 @dataclasses.dataclass

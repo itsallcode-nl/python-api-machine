@@ -107,6 +107,7 @@ class DynamoTable:
             table=self, objects=items
         )
 
+
 try:
     boto3.resource('dynamodb')
     deserializer = boto3.dynamodb.types.TypeDeserializer()
@@ -144,7 +145,7 @@ def inject_assumed_role(cfg_key: str, params: dict):
     if not assume_role:
         return
     sts_client = boto3.client('sts')
-    assumed_role_object=sts_client.assume_role(
+    assumed_role_object = sts_client.assume_role(
         RoleArn=assume_role,
         RoleSessionName=f"AssumeRoleDynamoDB"
     )
@@ -155,6 +156,7 @@ def inject_assumed_role(cfg_key: str, params: dict):
         aws_session_token=credentials['SessionToken'],
     )
     params.update(injection)
+
 
 @dataclass
 class DynamoRepository:
@@ -235,13 +237,14 @@ class DynamoRepository:
 
     def insert(self, data):
         client = self.client
-        return client.put_item(
+        _ = client.put_item(
             TableName=self.config.source.name,
             Item={
                 v: serializer.serialize(data.get(k)) for k, v in
                 self.config.source.schema.items()
             }
         )
+        return data
 
     def get(self, key: dict):
         client = self.client

@@ -273,7 +273,7 @@ class Service:
             event = events.ServiceAfterFail
         else:
             result = Message(
-                operation.output_ref,
+                f"{self.name}:{operation.output_ref}",
                 result
             )
 
