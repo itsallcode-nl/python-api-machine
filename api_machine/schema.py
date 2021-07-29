@@ -9,10 +9,15 @@ def dataclass_to_model(dc):
     return dataclass(dc)
 
 
-def serialize(i):
-    return json.loads(
-        i.__pydantic_model__(**asdict(i)).json()
-    )
+def serialize(i, to_string=False):
+    if hasattr(i, "__pydantic_model__"):
+        j = i.__pydantic_model__(**asdict(i)).json()
+    else:
+        j = json.loads(asdict(i))
+    if to_string:
+        return j
+
+    return json.loads(j)
 
 
 def extract_schema(name, entity, include=None):
