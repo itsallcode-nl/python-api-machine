@@ -205,9 +205,11 @@ class OperationRegistry(dict):
 
 class Service:
     operations = None
+    entities = None
 
     def __init__(self, name):
         self.operations = OperationRegistry()
+        self.entities = {}
         self.name = name
         self.events = Broadcaster()
         self.repos = {}
@@ -238,9 +240,13 @@ class Service:
             ListOperation.create("list", entity)
         )
         self.repos[entity.name] = repository
+        self.entities[entity.name] = entity
 
     def mount_operation(self, operation: Operation):
         self.operations.append(operation)
+
+    def get_key(self, entity_name: str):
+        return self.entities[entity_name].key
 
     def __call__(self, msg: InputMessage):
         scoped_ref = ":".join(msg.ref.split(":")[1:])
