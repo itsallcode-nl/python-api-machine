@@ -4,7 +4,7 @@ import typing
 from . import exc, events
 from .lifecycle import Transition
 from .entity import Entity, InputMessage, Message
-from .pubsub import Broadcaster
+from .pubsub import Broadcaster, RefStr
 from .schema import (
     extract_schema, dataclass_to_model, ValidationError,
     serialize
@@ -118,7 +118,7 @@ class Operation:
 
     def __call__(self, context: OperationContext, msg: InputMessage):
         msg = Message(
-            ref=self.ref,
+            ref=RefStr(self.ref),
             payload=self.deserialize(msg.payload),
         )
         return self.execute(context, msg)
@@ -273,13 +273,13 @@ class Service:
 
         except exc.ClientError as e:
             result = Message(
-                "system",
+                RefStr("{self.name}:system:result:error"),
                 e.payload
             )
             event = events.ServiceAfterFail
         else:
             result = Message(
-                f"{self.name}:{operation.output_ref}",
+                RefStr(f"{self.name}:{operation.output_ref}"),
                 result
             )
 

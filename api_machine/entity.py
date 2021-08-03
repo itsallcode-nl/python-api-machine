@@ -1,26 +1,20 @@
 from dataclasses import dataclass, field, fields, make_dataclass, replace
+from collections import namedtuple
 
 from .schema import dataclass_to_model
 from .lifecycle import StateMachine
-
-
-class InputMessageSchema:
-    pass
+from .pubsub import RefStr
 
 
 @dataclass
 class InputMessage:
-    ref: str
+    ref: RefStr
     payload: object
-
-
-class MessageSchema:
-    pass
 
 
 @dataclass
 class Message:
-    ref: str
+    ref: RefStr
     payload: object
 
 
@@ -53,7 +47,6 @@ class Entity:
         return obj
 
     def set_status(self, obj, action):
-        print(obj)
         if hasattr(obj, "status"):
             obj.status = self.lifecycle.do(
                 obj.status, action

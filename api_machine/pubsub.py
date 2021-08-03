@@ -3,6 +3,19 @@ import logging
 import typing
 
 
+class RefStr(str):
+    def __init__(self, s):
+        """ Split a [<service>:]<entity>:<action_type>:<action> """
+        result = s.split(":")
+        self.service = None
+        if len(result) == 4:
+            self.service = result.pop(0)
+        self.entity = result.pop(0)
+        self.action_type = result.pop(0)
+        self.action = result.pop(0)
+        str.__init__(self)
+
+
 def shoot_and_forget(handler, msg):
     try:
         handler(msg)
