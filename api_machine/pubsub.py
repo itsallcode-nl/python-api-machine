@@ -7,7 +7,7 @@ def shoot_and_forget(handler, msg):
     try:
         handler(msg)
     except Exception as e:
-        logging.warning(e)
+        logging.warning(e, exc_info=True)
 
 
 @dataclasses.dataclass
