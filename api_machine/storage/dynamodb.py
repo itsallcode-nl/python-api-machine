@@ -97,7 +97,7 @@ class DynamoTable:
                 "items": [
                     model(i) for i in self.items
                 ],
-                "cursor": self.cusor,
+                "cursor": self.cursor,
                 "next_cursor": self.cursor,
             }
 
