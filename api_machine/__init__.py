@@ -2,7 +2,7 @@
 
 __author__ = """Martijn Meijer"""
 __email__ = 'tech@itsallcode.nl'
-__version__ = '0.2.4'
+__version__ = '0.2.5'
 
 
 from .service import Service
