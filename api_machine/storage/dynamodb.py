@@ -30,12 +30,14 @@ class DynamoTable:
     sk: str
     dk: str
     schema: dict
-    components: dict
+    components: dict = None
 
     class Result:
         table: "DynamoTable"
         items: list
         objects: dict
+        cursor: str = None
+        next_cursor: str = None
 
         def __init__(self, table, objects):
             self.table = table
@@ -95,6 +97,8 @@ class DynamoTable:
                 "items": [
                     model(i) for i in self.items
                 ],
+                "cursor": self.cusor,
+                "next_cursor": self.cursor,
             }
 
     def deserialize(self, items: list):
@@ -112,7 +116,6 @@ try:
     boto3.resource('dynamodb')
     deserializer = boto3.dynamodb.types.TypeDeserializer()
     _serializer = boto3.dynamodb.types.TypeSerializer()
-
 except NoRegionError:
     # Ignore, this happens because of imports
     # that don't acutally require this service
@@ -201,6 +204,7 @@ class DynamoRepository:
                     ('RANGE', self.config.source.sk),
                 ]
             ],
+            BillingMode='PAY_PER_REQUEST'
         )
 
     def all(self) -> DynamoTable.Result:
@@ -210,13 +214,14 @@ class DynamoRepository:
         )
         return self.config.source.deserialize(response['Items'])
 
-    def list(self, expr, **params) -> DynamoTable.Result:
+    def list(self, expr, params, limit=100, cursor=None) -> DynamoTable.Result:
         client = self.client
         params = {
             f':{k}': serializer.serialize(v) for k, v in params.items()
         }
         query_params = dict(
             TableName=self.config.source.name,
+            Limit=limit,
         )
 
         if expr:
@@ -225,15 +230,19 @@ class DynamoRepository:
                 ExpressionAttributeValues=params,
             ))
 
+        if cursor:
+            query_params['ExclusiveStartKey'] = cursor
+
         response = client.query(**query_params)
         items = response['Items']
-        while 'LastEvaluatedKey' in response:
-            response = client.query(
-                ExclusiveStartKey=response['LastEvaluatedKey'],
-                **query_params
-            )
-            items.extend(response['Items'])
-        return self.config.source.deserialize(items)
+
+        result = self.config.source.deserialize(items)
+        result.cursor = cursor
+        if 'LastEvaluatedKey' in response:
+            result.next_cursor = response['LastEvaluatedKey']
+
+        return result
+
 
     def insert(self, data):
         client = self.client

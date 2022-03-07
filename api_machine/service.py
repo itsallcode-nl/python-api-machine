@@ -40,7 +40,7 @@ class OperationContext:
         list_params = asdict(payload)
         return self.repository.list(
             list_params.pop('expr'),
-            **list_params['params']
+            **list_params
         ).serialize(self.entity.create)
 
 
@@ -172,9 +172,13 @@ class ListOperation(Query):
         class ListModel:
             expr: str = ""
             params: dict = field(default_factory=dict)
+            cursor: dict = None
+            limit: int = 100
 
         class EntityList:
             items: typing.List[entity.schema]
+            cursor: dict = None
+            next_cursor: dict = None
 
         model = dataclass_to_model(ListModel)
         output_model = dataclass_to_model(EntityList)
