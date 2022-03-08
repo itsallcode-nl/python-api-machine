@@ -214,7 +214,7 @@ class DynamoRepository:
         )
         return self.config.source.deserialize(response['Items'])
 
-    def list(self, expr, params, limit=100, cursor=None) -> DynamoTable.Result:
+    def list(self, expr, params, limit=100, cursor=None, index_name=None) -> DynamoTable.Result:
         client = self.client
         params = {
             f':{k}': serializer.serialize(v) for k, v in params.items()
@@ -232,6 +232,9 @@ class DynamoRepository:
 
         if cursor:
             query_params['ExclusiveStartKey'] = cursor
+
+        if index_name:
+            query_params['IndexName'] = index_name
 
         response = client.query(**query_params)
         items = response['Items']

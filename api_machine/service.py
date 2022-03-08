@@ -174,6 +174,7 @@ class ListOperation(Query):
             params: dict = field(default_factory=dict)
             cursor: dict = None
             limit: int = 100
+            index_name: str = None
 
         class EntityList:
             items: typing.List[entity.schema]
