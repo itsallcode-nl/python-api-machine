@@ -98,7 +98,7 @@ class DynamoTable:
                     model(i) for i in self.items
                 ],
                 "cursor": self.cursor,
-                "next_cursor": self.cursor,
+                "next_cursor": self.next_cursor,
             }
 
     def deserialize(self, items: list):
