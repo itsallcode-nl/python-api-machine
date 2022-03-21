@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 
 STATE_WILDCARD = "*"
 
@@ -9,6 +9,16 @@ class Transition:
     action: str
     target: str
     metadata: dict = field(default_factory=dict)
+
+
+@dataclass
+class ScopedTransition(Transition):
+    scope: InitVar[callable] = None
+
+    def __post_init__(self, scope):
+        self.metadata['scoped'] = dict(
+            fields=scope
+        )
 
 
 class StateMachine:
@@ -39,6 +49,6 @@ class StateMachine:
 
 CrudLifeCycle = [
     Transition(None, 'create', 'active'),
-    Transition('active', 'update', 'active'),
+    ScopedTransition('active', 'update', 'active', scope=lambda e: e.fields(e.mutable.union(e.key))),
     Transition('active', 'delete', 'deleted'),
 ]

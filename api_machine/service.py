@@ -83,9 +83,7 @@ class Operation:
 
     @classmethod
     def create(cls, action, entity, scope=None):
-        fields = scope or cls.get_fields(
-            entity
-        )
+        fields = scope or entity.fields()
         input_fields = fields - entity.private
         name = cls.name(action, entity)
         return cls(
@@ -226,6 +224,8 @@ class Service:
             scope = None
             try:
                 scope = params['scoped']['fields']
+                if callable(scope):
+                    scope = scope(entity)
             except KeyError:
                 pass
 

@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field, fields, make_dataclass, replace
 from collections import namedtuple
+import copy
 
 from .schema import dataclass_to_model
 from .lifecycle import StateMachine
@@ -32,16 +33,26 @@ class Entity:
 
     key: list = field(default_factory=lambda: {'id'})
     indices: list = None
+    migrations: list = None
 
     def __post_init__(self):
         if isinstance(self.lifecycle, list):
-            self.lifecycle = StateMachine(self.lifecycle)
+            self.lifecycle = StateMachine(copy.deepcopy(self.lifecycle))
 
     def create(self, values: dict):
-        return self.schema(**values)
+        version = values.get('__version__') or 0
+        for migration in self.migrations[version:]:
+            version += 1
+            values = migration(values)
+        result = self.schema(**values)
+        result.__version__ = version
+        return result
 
     def update(self, obj, values: dict):
-        return replace(obj, **values)
+        result = replace(obj, **values)
+        if hasattr(obj, "__version__"):
+            result.__version__ = obj.__version__
+        return result
 
     def delete(self, obj):
         return obj
@@ -64,9 +75,10 @@ class Entity:
             result = [f for f in result if f.name in include]
         if aslist:
             return list(
-                (f.name, f.type, field(default_factory=f.default_factory))
+                (f.name, f.type, field(default_factory=f.default_factory, default=f.default))
                 for f in result
             )
+
         return set(
-            f.name for f in result
+            list(f.name for f in result)
         )

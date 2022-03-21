@@ -11,10 +11,14 @@ def dataclass_to_model(dc):
 
 
 def serialize(i, to_string=False):
+    d = asdict(i)
+    version = getattr(i, '__version__', 0)
+
     if hasattr(i, "__pydantic_model__"):
-        j = i.__pydantic_model__(**asdict(i)).json()
-    else:
-        j = json.dumps(asdict(i), default=pydantic_encoder)
+        d = i.__pydantic_model__(**d).dict()
+
+    d['__version__'] = version
+    j = json.dumps(d, default=pydantic_encoder)
     if to_string:
         return j
 

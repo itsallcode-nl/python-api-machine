@@ -42,6 +42,8 @@ class DynamoTable:
         def __init__(self, table, objects):
             self.table = table
             self.objects = defaultdict(dict)
+            schema = {**self.table.schema}
+            schema['__version__'] = '__version__'
             self.items = []
             if len(self.table.components) == 0:
                 for obj in objects:
@@ -253,7 +255,7 @@ class DynamoRepository:
             TableName=self.config.source.name,
             Item={
                 v: serializer.serialize(data.get(k)) for k, v in
-                self.config.source.schema.items()
+                list(self.config.source.schema.items()) + [['__version__', '__version__']]
             }
         )
         return data
