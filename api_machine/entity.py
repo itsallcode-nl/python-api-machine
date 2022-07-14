@@ -33,7 +33,7 @@ class Entity:
 
     key: list = field(default_factory=lambda: {'id'})
     indices: list = None
-    migrations: list = None
+    migrations: list = field(default_factory=list)
 
     def __post_init__(self):
         if isinstance(self.lifecycle, list):
