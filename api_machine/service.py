@@ -99,7 +99,7 @@ class Operation:
 
     def deserialize(self, payload):
         try:
-            obj = self.input_model(**payload)
+            obj = self.input_model.from_dict(payload)
         except ValidationError as e:
             raise exc.ValidationError(
                 e.json()
