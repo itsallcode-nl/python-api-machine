@@ -45,6 +45,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/itsallcode-nl/python_api_machine',
-    version='0.8.0',
+    version='0.9.0',
     zip_safe=False,
 )
