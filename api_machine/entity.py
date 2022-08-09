@@ -41,9 +41,10 @@ class Entity:
 
     def create(self, values: dict):
         version = values.get('__version__') or 0
-        for migration in self.migrations[version:]:
-            version += 1
-            values = migration(values)
+        if self.migrations:
+            for migration in self.migrations[version:]:
+                version += 1
+                values = migration(values)
         result = self.schema(**values)
         result.__version__ = version
         return result
