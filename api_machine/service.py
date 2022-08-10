@@ -83,7 +83,7 @@ class Operation:
 
     @classmethod
     def create(cls, action, entity, scope=None):
-        fields = scope or entity.fields()
+        fields = scope or cls.get_fields(entity)
         input_fields = fields - entity.private
         name = cls.name(action, entity)
         return cls(
