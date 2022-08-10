@@ -1,4 +1,4 @@
-from dataclasses import make_dataclass, field, asdict
+from dataclasses import make_dataclass, field, asdict, fields
 import json
 
 from pydantic import create_model, ValidationError
@@ -35,3 +35,13 @@ def extract_schema(name, entity, include=None):
         (f[0], f[1]) for f in fields
     )
     return dataclass(cls)
+
+
+def filter_dict_to_schema(entity: dataclass, payload: dict):
+    fs = [
+        f.name for f in fields(entity)
+    ]
+    return dict(
+        (key, value) for key, value in payload.items()
+        if key in fs
+    )

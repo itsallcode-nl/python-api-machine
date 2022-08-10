@@ -32,7 +32,9 @@ def test_api():
         ref='TestApp:Article:command:create',
         payload={
             'id': 'articleid1',
-            'subject': 'test subject'
+            'subject': 'test subject',
+            'droppedfield': 'should drop without errors'
+
         }
     ))
     created_instance = result.payload

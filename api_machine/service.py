@@ -7,7 +7,7 @@ from .entity import Entity, InputMessage, Message
 from .pubsub import Broadcaster, RefStr
 from .schema import (
     extract_schema, dataclass_to_model, ValidationError,
-    serialize
+    serialize, filter_dict_to_schema
 )
 
 
@@ -98,8 +98,9 @@ class Operation:
         return entity.fields()
 
     def deserialize(self, payload):
+        payload = filter_dict_to_schema(self.input_model, payload)
         try:
-            obj = self.input_model.from_dict(payload)
+            obj = self.input_model(**payload)
         except ValidationError as e:
             raise exc.ValidationError(
                 e.json()
