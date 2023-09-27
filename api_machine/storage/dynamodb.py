@@ -1,3 +1,4 @@
+import functools
 from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
@@ -174,7 +175,7 @@ class DynamoRepository:
 
     config: Config
 
-    @property
+    @functools.cached_property
     def client(self):
         params = {}
         inject_assumed_role("API_MACHINE_AWS_ASSUME_ROLE", params)
